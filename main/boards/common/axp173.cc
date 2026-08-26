@@ -78,18 +78,16 @@ void Axp173::PowerOff() {
         ESP_LOGE(TAG, "I2C未初始化！");
         return;
     }
-    ESP_LOGI(TAG, "关闭所有电源输出并关机...");
+    ESP_LOGI(TAG, "触发AXP173正常关机...");
 
-    // 2. 关闭EXTEN（功放）
+    // 2. 先关闭功放，避免关机瞬间外设残留噪声。
     WriteReg(AXP173_REG_10_EXTEN, 0x00);
-
-    // 3. 关闭所有电源输出：DCDC1/DCDC2/LDO2/LDO3/LDO4/EXTEN 全部关闭
-    //    REG 12H: bit6=EXTEN, bit4=DCDC2, bit3=LDO3, bit2=LDO2, bit1=LDO4, bit0=DCDC1
-    WriteReg(0x12, 0x00);
 
     vTaskDelay(pdMS_TO_TICKS(100));
 
-    // 4. 触发关机（REG 32H bit7=1），充电电路独立工作不受影响
+    // 3. 不主动清零REG12，避免在PMIC关机状态机完成前提前切断主电源轨，
+    //    否则可能导致关机后PEK短按启动不稳定。
+    // 4. 触发关机（REG 32H bit7=1），交给AXP173按正常时序关闭各路输出。
     uint8_t value = ReadReg(0x32);
     value = value | 0B10000000;
     WriteReg(0x32, value);
