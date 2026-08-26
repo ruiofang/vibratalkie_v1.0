@@ -251,6 +251,7 @@ int BoxAudioCodec::Read(int16_t* dest, int samples) {
     if (input_enabled_) {
         ESP_ERROR_CHECK_WITHOUT_ABORT(esp_codec_dev_read(input_dev_, (void*)dest, samples * sizeof(int16_t)));
 
+#if !CONFIG_PC_RAW_STREAM_MODE
         // ES7210 hardware wiring convention: AEC reference (ES8311 DAC loopback) is
         // always on MIC2 pin = TDM slot 1. For multi-mic boards, physical TDM order is:
         //   [slot0=MIC1, slot1=REF, slot2=MIC2, slot3=MIC3, ...]
@@ -290,6 +291,7 @@ int BoxAudioCodec::Read(int16_t* dest, int samples) {
                 // Reference channel [input_channels_-1] is left intact
             }
         }
+#endif
     }
     return samples;
 }

@@ -248,6 +248,34 @@ config RECEIVE_CUSTOM_MESSAGE
 menu "VIBRATALKIE_CONFIG"
     depends on BOARD_TYPE_VIBRATALKIE
 
+    config PC_RAW_STREAM_MODE
+        bool "Enable PC raw audio/ADC server mode"
+        default n
+        help
+            Disable the cloud dialog protocol and stream timestamped native PCM and
+            ADS1115 raw samples to a PC over UDP. The same UDP port accepts 24 kHz,
+            mono, signed 16-bit PCM for speaker playback.
+
+    config PC_RAW_STREAM_SERVER
+        string "PC server IPv4 address"
+        default "255.255.255.255"
+        depends on PC_RAW_STREAM_MODE
+        help
+            Keep the default broadcast address for automatic discovery. The PC
+            replies from UDP port 9999 and the device then switches to its unicast IP.
+
+    config PC_RAW_STREAM_PORT
+        int "PC raw stream UDP port"
+        default 9999
+        range 1024 65535
+        depends on PC_RAW_STREAM_MODE
+
+    config PC_RAW_STREAM_ADC_RATE
+        int "ADS1115 sample rate (samples/second)"
+        default 800
+        range 1 860
+        depends on PC_RAW_STREAM_MODE
+
     choice DISPLAY_LCD_VIBRATALKIE
         prompt "LCD Display Type"
         default DISPLAY_USE_ST7789

@@ -40,6 +40,10 @@ set(SOURCES "audio/audio_codec.cc"
 
 set(INCLUDE_DIRS "." "display" "display/lvgl_display" "display/lvgl_display/jpg" "audio" "protocols")
 
+if(CONFIG_PC_RAW_STREAM_MODE)
+    list(APPEND SOURCES "pc_raw_stream_service.cc")
+endif()
+
 # Add board common files
 file(GLOB BOARD_COMMON_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/boards/common/*.cc)
 # Vibratalkie has no camera; do not compile the legacy common camera wrapper.

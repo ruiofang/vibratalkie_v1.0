@@ -13,6 +13,7 @@
 #include <freertos/event_groups.h>
 #include <esp_timer.h>
 #include <model_path.h>
+#include <sdkconfig.h>
 
 #include <opus_encoder.h>
 #include <opus_decoder.h>
@@ -38,7 +39,11 @@
 
 #define OPUS_FRAME_DURATION_MS 60
 #define MAX_ENCODE_TASKS_IN_QUEUE 2
+#if CONFIG_PC_RAW_STREAM_MODE
+#define MAX_PLAYBACK_TASKS_IN_QUEUE 12
+#else
 #define MAX_PLAYBACK_TASKS_IN_QUEUE 2
+#endif
 #define MAX_DECODE_PACKETS_IN_QUEUE (2400 / OPUS_FRAME_DURATION_MS)
 #define MAX_SEND_PACKETS_IN_QUEUE (2400 / OPUS_FRAME_DURATION_MS)
 #define AUDIO_TESTING_MAX_DURATION_MS 10000
@@ -52,12 +57,15 @@
 #define AS_EVENT_WAKE_WORD_RUNNING          (1 << 1)
 #define AS_EVENT_AUDIO_PROCESSOR_RUNNING    (1 << 2)
 #define AS_EVENT_PLAYBACK_NOT_EMPTY         (1 << 3)
+#define AS_EVENT_RAW_AUDIO_RUNNING          (1 << 4)
 
 struct AudioServiceCallbacks {
     std::function<void(void)> on_send_queue_available;
     std::function<void(const std::string&)> on_wake_word_detected;
     std::function<void(bool)> on_vad_change;
     std::function<void(void)> on_audio_testing_queue_full;
+    std::function<void(const int16_t* data, size_t samples, int sample_rate,
+                       int channels, uint64_t timestamp_us)> on_raw_audio;
 };
 
 
@@ -101,10 +109,13 @@ public:
     void EnableVoiceProcessing(bool enable);
     void EnableAudioTesting(bool enable);
     void EnableDeviceAec(bool enable);
+    void EnableRawAudioCapture(bool enable);
 
     void SetCallbacks(AudioServiceCallbacks& callbacks);
 
     bool PushPacketToDecodeQueue(std::unique_ptr<AudioStreamPacket> packet, bool wait = false);
+    bool PushPcmToPlaybackQueue(std::vector<int16_t>&& pcm, int sample_rate,
+                                int channels, uint64_t timestamp_us = 0);
     std::unique_ptr<AudioStreamPacket> PopPacketFromSendQueue();
     void PlaySound(const std::string_view& sound);
     bool ReadAudioData(std::vector<int16_t>& data, int sample_rate, int samples);

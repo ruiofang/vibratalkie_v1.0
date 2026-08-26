@@ -93,7 +93,8 @@ void AudioService::Initialize(AudioCodec* codec) {
 
 void AudioService::Start() {
     service_stopped_ = false;
-    xEventGroupClearBits(event_group_, AS_EVENT_AUDIO_TESTING_RUNNING | AS_EVENT_WAKE_WORD_RUNNING | AS_EVENT_AUDIO_PROCESSOR_RUNNING);
+    xEventGroupClearBits(event_group_, AS_EVENT_AUDIO_TESTING_RUNNING | AS_EVENT_WAKE_WORD_RUNNING |
+        AS_EVENT_AUDIO_PROCESSOR_RUNNING | AS_EVENT_RAW_AUDIO_RUNNING);
 
     esp_timer_start_periodic(audio_power_timer_, 1000000);
 
@@ -140,7 +141,8 @@ void AudioService::Stop() {
     service_stopped_ = true;
     xEventGroupSetBits(event_group_, AS_EVENT_AUDIO_TESTING_RUNNING |
         AS_EVENT_WAKE_WORD_RUNNING |
-        AS_EVENT_AUDIO_PROCESSOR_RUNNING);
+        AS_EVENT_AUDIO_PROCESSOR_RUNNING |
+        AS_EVENT_RAW_AUDIO_RUNNING);
 
     std::lock_guard<std::mutex> lock(audio_queue_mutex_);
     audio_encode_queue_.clear();
@@ -217,7 +219,7 @@ bool AudioService::ReadAudioData(std::vector<int16_t>& data, int sample_rate, in
 void AudioService::AudioInputTask() {
     while (true) {
         EventBits_t bits = xEventGroupWaitBits(event_group_, AS_EVENT_AUDIO_TESTING_RUNNING |
-            AS_EVENT_WAKE_WORD_RUNNING | AS_EVENT_AUDIO_PROCESSOR_RUNNING,
+            AS_EVENT_WAKE_WORD_RUNNING | AS_EVENT_AUDIO_PROCESSOR_RUNNING | AS_EVENT_RAW_AUDIO_RUNNING,
             pdFALSE, pdFALSE, portMAX_DELAY);
 
         if (service_stopped_) {
@@ -226,6 +228,20 @@ void AudioService::AudioInputTask() {
         if (audio_input_need_warmup_) {
             audio_input_need_warmup_ = false;
             vTaskDelay(pdMS_TO_TICKS(120));
+            continue;
+        }
+
+        /* PC raw-stream mode bypasses AFE/Opus and preserves every codec channel. */
+        if (bits & AS_EVENT_RAW_AUDIO_RUNNING) {
+            std::vector<int16_t> data;
+            constexpr int kRawFrameDurationMs = 10;
+            const int sample_rate = codec_->input_sample_rate();
+            const int samples = kRawFrameDurationMs * sample_rate / 1000;
+            const uint64_t timestamp_us = esp_timer_get_time();
+            if (ReadAudioData(data, sample_rate, samples) && callbacks_.on_raw_audio) {
+                callbacks_.on_raw_audio(data.data(), data.size(), sample_rate,
+                                        codec_->input_channels(), timestamp_us);
+            }
             continue;
         }
 
@@ -445,6 +461,28 @@ bool AudioService::PushPacketToDecodeQueue(std::unique_ptr<AudioStreamPacket> pa
     return true;
 }
 
+bool AudioService::PushPcmToPlaybackQueue(std::vector<int16_t>&& pcm, int sample_rate,
+                                          int channels, uint64_t timestamp_us) {
+    if (sample_rate != codec_->output_sample_rate() || channels != codec_->output_channels() || pcm.empty()) {
+        ESP_LOGW(TAG, "Reject PCM playback: got %d Hz/%d ch, expected %d Hz/%d ch",
+                 sample_rate, channels, codec_->output_sample_rate(), codec_->output_channels());
+        return false;
+    }
+
+    auto task = std::make_unique<AudioTask>();
+    task->type = kAudioTaskTypeDecodeToPlaybackQueue;
+    task->pcm = std::move(pcm);
+    task->timestamp = static_cast<uint32_t>(timestamp_us / 1000);
+
+    std::lock_guard<std::mutex> lock(audio_queue_mutex_);
+    if (audio_playback_queue_.size() >= MAX_PLAYBACK_TASKS_IN_QUEUE) {
+        return false;
+    }
+    audio_playback_queue_.push_back(std::move(task));
+    audio_queue_cv_.notify_all();
+    return true;
+}
+
 std::unique_ptr<AudioStreamPacket> AudioService::PopPacketFromSendQueue() {
     std::lock_guard<std::mutex> lock(audio_queue_mutex_);
     if (audio_send_queue_.empty()) {
@@ -536,6 +574,15 @@ void AudioService::EnableDeviceAec(bool enable) {
     }
 
     audio_processor_->EnableDeviceAec(enable);
+}
+
+void AudioService::EnableRawAudioCapture(bool enable) {
+    ESP_LOGI(TAG, "%s raw audio capture", enable ? "Enabling" : "Disabling");
+    if (enable) {
+        xEventGroupSetBits(event_group_, AS_EVENT_RAW_AUDIO_RUNNING);
+    } else {
+        xEventGroupClearBits(event_group_, AS_EVENT_RAW_AUDIO_RUNNING);
+    }
 }
 
 void AudioService::SetCallbacks(AudioServiceCallbacks& callbacks) {

@@ -16,6 +16,9 @@
 #include <driver/gpio.h>
 #include <arpa/inet.h>
 #include <font_awesome.h>
+#if CONFIG_PC_RAW_STREAM_MODE
+#include <wifi_station.h>
+#endif
 
 #define TAG "Application"
 
@@ -370,6 +373,14 @@ void Application::Start() {
     callbacks.on_vad_change = [this](bool speaking) {
         xEventGroupSetBits(event_group_, MAIN_EVENT_VAD_CHANGE);
     };
+#if CONFIG_PC_RAW_STREAM_MODE
+    callbacks.on_raw_audio = [this](const int16_t* data, size_t samples, int sample_rate,
+                                    int channels, uint64_t timestamp_us) {
+        if (pc_raw_stream_service_) {
+            pc_raw_stream_service_->SendAudio(data, samples, sample_rate, channels, timestamp_us);
+        }
+    };
+#endif
     audio_service_.SetCallbacks(callbacks);
 
     // Start the main event loop task with priority 3
@@ -379,13 +390,54 @@ void Application::Start() {
     }, "main_event_loop", 2048 * 4, this, 3, &main_event_loop_task_handle_);
 
     /* Start the clock timer to update the status bar */
+#if !CONFIG_PC_RAW_STREAM_MODE
     esp_timer_start_periodic(clock_timer_handle_, 1000000);
+#endif
 
     /* Wait for the network to be ready */
     board.StartNetwork();
 
     // Update the status bar immediately to show the network state
     display->UpdateStatusBar(true);
+
+#if CONFIG_PC_RAW_STREAM_MODE
+    board.SetPowerSaveMode(false);
+    pc_raw_stream_service_ = std::make_unique<PcRawStreamService>(audio_service_);
+    pc_raw_stream_service_->SetServerDiscoveredCallback(
+        [this](const std::string& pc_ip, uint16_t pc_port) {
+            Schedule([pc_ip, pc_port]() {
+                auto display = Board::GetInstance().GetDisplay();
+                const auto& wifi_station = WifiStation::GetInstance();
+                std::string debug_info = "IP  " + wifi_station.GetIpAddress();
+                debug_info += "\nPC  " + pc_ip + ":" + std::to_string(pc_port);
+                debug_info += "\nRX  UDP :" + std::to_string(CONFIG_PC_RAW_STREAM_PORT);
+                debug_info += "\nPCM 24kHz 3ch S16";
+                debug_info += "\nADC " + std::to_string(CONFIG_PC_RAW_STREAM_ADC_RATE) + "Hz S16";
+                display->SetStatus("PC Connected");
+                display->SetChatMessage("system", debug_info.c_str());
+            });
+        });
+    if (!pc_raw_stream_service_->Start()) {
+        std::string error = "UDP " + std::to_string(CONFIG_PC_RAW_STREAM_PORT) + " 服务启动失败";
+        Alert("PC Stream", error.c_str(), "circle_xmark", Lang::Sounds::OGG_EXCLAMATION);
+    } else {
+        SetDeviceState(kDeviceStateIdle);
+        display->SetStatus("PC Stream");
+        const auto& wifi_station = WifiStation::GetInstance();
+        std::string debug_info = "IP  " + wifi_station.GetIpAddress();
+        debug_info += "\nTX  ";
+        debug_info += CONFIG_PC_RAW_STREAM_SERVER;
+        debug_info += ":" + std::to_string(CONFIG_PC_RAW_STREAM_PORT);
+        debug_info += "\nRX  UDP :" + std::to_string(CONFIG_PC_RAW_STREAM_PORT);
+        debug_info += "\nPCM 24kHz 3ch S16";
+        debug_info += "\nADC " + std::to_string(CONFIG_PC_RAW_STREAM_ADC_RATE) + "Hz S16";
+        display->SetChatMessage("system", debug_info.c_str());
+        ESP_LOGI(TAG, "PC stream display: local=%s, target=%s:%d, ADC=%dHz",
+                 wifi_station.GetIpAddress().c_str(), CONFIG_PC_RAW_STREAM_SERVER,
+                 CONFIG_PC_RAW_STREAM_PORT, CONFIG_PC_RAW_STREAM_ADC_RATE);
+    }
+    return;
+#endif
 
     // Check for new assets version
     CheckAssetsVersion();
@@ -686,7 +738,11 @@ void Application::SetDeviceState(DeviceState state) {
             display->SetStatus(Lang::Strings::STANDBY);
             display->SetEmotion("neutral");
             audio_service_.EnableVoiceProcessing(false);
+#if CONFIG_PC_RAW_STREAM_MODE
+            audio_service_.EnableWakeWordDetection(false);
+#else
             audio_service_.EnableWakeWordDetection(true);
+#endif
             break;
         case kDeviceStateConnecting:
             display->SetStatus(Lang::Strings::CONNECTING);

@@ -16,6 +16,10 @@
 #include "audio_service.h"
 #include "device_state_event.h"
 
+#if CONFIG_PC_RAW_STREAM_MODE
+#include "pc_raw_stream_service.h"
+#endif
+
 
 #define MAIN_EVENT_SCHEDULE (1 << 0)
 #define MAIN_EVENT_SEND_AUDIO (1 << 1)
@@ -78,6 +82,9 @@ private:
     AecMode aec_mode_ = kAecOff;
     std::string last_error_message_;
     AudioService audio_service_;
+#if CONFIG_PC_RAW_STREAM_MODE
+    std::unique_ptr<PcRawStreamService> pc_raw_stream_service_;
+#endif
 
     bool has_server_time_ = false;
     bool aborted_ = false;

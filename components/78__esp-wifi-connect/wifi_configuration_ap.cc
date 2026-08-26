@@ -252,6 +252,11 @@ std::vector<wifi_ap_record_t> WifiConfigurationAp::GetAccessPoints()
     return ap_records_;
 }   
 
+void WifiConfigurationAp::OnConnected(
+    std::function<void(const std::string& ssid, const std::string& ip)> callback) {
+    on_connected_ = std::move(callback);
+}
+
 WifiConfigurationAp::~WifiConfigurationAp()
 {
     if (scan_timer_) {
@@ -342,6 +347,7 @@ void WifiConfigurationAp::StartAccessPoint()
 
     // Create the default event loop
     ap_netif_ = esp_netif_create_default_wifi_ap();
+    station_netif_ = esp_netif_create_default_wifi_sta();
 
     // Set the router IP address to 192.168.4.1
     esp_netif_ip_info_t ip_info;
@@ -530,6 +536,18 @@ void WifiConfigurationAp::StartWebServer()
         .method = HTTP_GET,
         .handler = [](httpd_req_t *req) -> esp_err_t {
             auto *this_ = static_cast<WifiConfigurationAp *>(req->user_ctx);
+
+            if (strstr(req->uri, "refresh=1") != nullptr && !this_->is_connecting_) {
+                {
+                    std::lock_guard<std::mutex> lock(this_->mutex_);
+                    this_->ap_records_.clear();
+                    this_->scan_finished_ = false;
+                }
+                esp_err_t err = esp_wifi_scan_start(nullptr, false);
+                if (err != ESP_OK && err != ESP_ERR_WIFI_STATE) {
+                    ESP_LOGW(TAG, "Manual WiFi scan failed to start: %s", esp_err_to_name(err));
+                }
+            }
             std::lock_guard<std::mutex> lock(this_->mutex_);
 
             // Check if 5G is supported
@@ -543,6 +561,7 @@ void WifiConfigurationAp::StartWebServer()
             httpd_resp_set_hdr(req, "Connection", "close");
             httpd_resp_sendstr_chunk(req, "{\"support_5g\":");
             httpd_resp_sendstr_chunk(req, support_5g ? "true" : "false");
+            httpd_resp_sendstr_chunk(req, this_->scan_finished_ ? ",\"scan_complete\":true" : ",\"scan_complete\":false");
             httpd_resp_sendstr_chunk(req, ",\"aps\":[");
             for (int i = 0; i < this_->ap_records_.size(); i++) {
                 ESP_LOGI(TAG, "SSID: %s, RSSI: %d, Authmode: %d",
@@ -1133,6 +1152,25 @@ void WifiConfigurationAp::StartWebServer()
     };
     ESP_ERROR_CHECK(httpd_register_uri_handler(server_, &advanced_submit));
 
+    // Some phones open the captive portal with a vendor-specific path such as
+    // /small/html/index.html. Keep this handler last so API routes above take
+    // precedence, while any otherwise unknown GET path still opens the setup UI.
+    httpd_uri_t frontend_fallback = {
+        .uri = "/*",
+        .method = HTTP_GET,
+        .handler = [](httpd_req_t *req) -> esp_err_t {
+            ESP_LOGI(TAG, "Serving configuration page for captive portal path: %s", req->uri);
+            httpd_resp_set_status(req, "200 OK");
+            httpd_resp_set_type(req, "text/html");
+            httpd_resp_set_hdr(req, "Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+            httpd_resp_set_hdr(req, "Pragma", "no-cache");
+            httpd_resp_set_hdr(req, "Connection", "close");
+            return httpd_resp_send(req, index_html_start, strlen(index_html_start));
+        },
+        .user_ctx = nullptr
+    };
+    ESP_ERROR_CHECK(httpd_register_uri_handler(server_, &frontend_fallback));
+
     ESP_LOGI(TAG, "Web server started");
 }
 
@@ -1179,6 +1217,9 @@ bool WifiConfigurationAp::ConnectToWifi(const std::string &ssid, const std::stri
 
     if (bits & WIFI_GOT_IP_BIT) {
         ESP_LOGI(TAG, "Connected to WiFi %s", ssid.c_str());
+        if (on_connected_) {
+            on_connected_(ssid, ip_address_);
+        }
         return true;
     } else {
         ESP_LOGE(TAG, "Failed to connect to WiFi %s", ssid.c_str());
@@ -1212,6 +1253,7 @@ void WifiConfigurationAp::WifiEventHandler(void* arg, esp_event_base_t event_bas
 
         self->ap_records_.resize(ap_num);
         esp_wifi_scan_get_ap_records(&ap_num, self->ap_records_.data());
+        self->scan_finished_ = true;
 
         // 扫描完成，等待10秒后再次扫描
         esp_timer_start_once(self->scan_timer_, 10 * 1000000);
@@ -1223,6 +1265,9 @@ void WifiConfigurationAp::IpEventHandler(void* arg, esp_event_base_t event_base,
     WifiConfigurationAp* self = static_cast<WifiConfigurationAp*>(arg);
     if (event_id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
+        char ip_address[16];
+        esp_ip4addr_ntoa(&event->ip_info.ip, ip_address, sizeof(ip_address));
+        self->ip_address_ = ip_address;
         ESP_LOGI(TAG, "Got IP:" IPSTR, IP2STR(&event->ip_info.ip));
         xEventGroupSetBits(self->event_group_, WIFI_CONNECTED_BIT | WIFI_GOT_IP_BIT);
     }
@@ -1325,6 +1370,10 @@ void WifiConfigurationAp::Stop() {
     if (ap_netif_) {
         esp_netif_destroy(ap_netif_);
         ap_netif_ = nullptr;
+    }
+    if (station_netif_) {
+        esp_netif_destroy(station_netif_);
+        station_netif_ = nullptr;
     }
 
     ESP_LOGI(TAG, "Wifi configuration AP stopped");

@@ -49,6 +49,7 @@ public:
     virtual void StartNetwork() = 0;
     virtual const char* GetNetworkStateIcon() = 0;
     virtual bool GetBatteryLevel(int &level, bool& charging, bool& discharging);
+    virtual bool ReadAdcRaw(int16_t& raw) { return false; }
     virtual std::string GetSystemInfoJson();
 
     // 新增：节能定时器和软关机接口

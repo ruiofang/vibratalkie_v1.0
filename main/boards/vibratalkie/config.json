@@ -13,6 +13,23 @@
                 "CONFIG_ESP_WIFI_ENABLE_SAE_H2E=n",
                 "CONFIG_ESP_WIFI_SOFTAP_SAE_SUPPORT=n"
             ]
+        },
+        {
+            "name": "vibratalkie-pc-stream",
+            "sdkconfig_append": [
+                "CONFIG_BOARD_TYPE_VIBRATALKIE=y",
+                "CONFIG_PC_RAW_STREAM_MODE=y",
+                "CONFIG_PC_RAW_STREAM_SERVER=\"255.255.255.255\"",
+                "CONFIG_PC_RAW_STREAM_PORT=9999",
+                "CONFIG_PC_RAW_STREAM_ADC_RATE=800",
+                "CONFIG_USE_DEVICE_AEC=n",
+                "CONFIG_ESP_PHY_MAX_WIFI_TX_POWER=20",
+                "CONFIG_ESP_PHY_MAX_TX_POWER=20",
+                "CONFIG_ESP_WIFI_ENABLE_WPA3_SAE=n",
+                "CONFIG_ESP_WIFI_ENABLE_SAE_PK=n",
+                "CONFIG_ESP_WIFI_ENABLE_SAE_H2E=n",
+                "CONFIG_ESP_WIFI_SOFTAP_SAE_SUPPORT=n"
+            ]
         }
     ]
 }

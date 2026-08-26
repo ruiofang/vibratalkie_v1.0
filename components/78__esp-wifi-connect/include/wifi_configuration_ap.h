@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <mutex>
+#include <functional>
 
 #include <esp_http_server.h>
 #include <esp_event.h>
@@ -21,6 +22,7 @@ public:
     void Start();
     void Stop();
     void StartSmartConfig();
+    void OnConnected(std::function<void(const std::string& ssid, const std::string& ip)> callback);
     bool ConnectToWifi(const std::string &ssid, const std::string &password);
     void Save(const std::string &ssid, const std::string &password);
     std::vector<wifi_ap_record_t> GetAccessPoints();
@@ -42,11 +44,15 @@ private:
     EventGroupHandle_t event_group_;
     std::string ssid_prefix_;
     std::string language_;
+    std::string ip_address_;
+    std::function<void(const std::string& ssid, const std::string& ip)> on_connected_;
     esp_event_handler_instance_t instance_any_id_;
     esp_event_handler_instance_t instance_got_ip_;
     esp_timer_handle_t scan_timer_ = nullptr;
     bool is_connecting_ = false;
+    bool scan_finished_ = false;
     esp_netif_t* ap_netif_ = nullptr;
+    esp_netif_t* station_netif_ = nullptr;
     std::vector<wifi_ap_record_t> ap_records_;
 
     // 高级配置项

@@ -16,8 +16,30 @@
 #include <wifi_configuration_ap.h>
 #include <ssid_manager.h>
 #include "afsk_demod.h"
+#include "sdkconfig.h"
 
 static const char *TAG = "WifiBoard";
+
+namespace {
+
+void ShowNetworkDebugInfo(const std::string& ssid, const std::string& ip) {
+    auto display = Board::GetInstance().GetDisplay();
+    std::string info = "SSID " + ssid;
+    info += "\nIP   " + ip;
+#if CONFIG_PC_RAW_STREAM_MODE
+    info += "\nTX   ";
+    info += CONFIG_PC_RAW_STREAM_SERVER;
+    info += ":" + std::to_string(CONFIG_PC_RAW_STREAM_PORT);
+    info += "\nRX   UDP :" + std::to_string(CONFIG_PC_RAW_STREAM_PORT);
+    info += "\nPCM  24kHz 3ch S16";
+    info += "\nADC  " + std::to_string(CONFIG_PC_RAW_STREAM_ADC_RATE) + "Hz S16";
+#endif
+    display->SetStatus("Network Debug");
+    display->SetChatMessage("system", info.c_str());
+    ESP_LOGI(TAG, "Network debug display: SSID=%s, IP=%s", ssid.c_str(), ip.c_str());
+}
+
+}  // namespace
 
 WifiBoard::WifiBoard() {
     Settings settings("wifi", true);
@@ -39,6 +61,9 @@ void WifiBoard::EnterWifiConfigMode() {
     auto& wifi_ap = WifiConfigurationAp::GetInstance();
     wifi_ap.SetLanguage(Lang::CODE);
     wifi_ap.SetSsidPrefix("Xiaozhi");
+    wifi_ap.OnConnected([](const std::string& ssid, const std::string& ip) {
+        ShowNetworkDebugInfo(ssid, ip);
+    });
     wifi_ap.Start();
 
     // 等待 1.5 秒显示开发板信息
@@ -100,10 +125,7 @@ void WifiBoard::StartNetwork() {
         display->ShowNotification(notification.c_str(), 30000);
     });
     wifi_station.OnConnected([this](const std::string& ssid) {
-        auto display = Board::GetInstance().GetDisplay();
-        std::string notification = Lang::Strings::CONNECTED_TO;
-        notification += ssid;
-        display->ShowNotification(notification.c_str(), 30000);
+        ShowNetworkDebugInfo(ssid, WifiStation::GetInstance().GetIpAddress());
     });
     wifi_station.Start();
 

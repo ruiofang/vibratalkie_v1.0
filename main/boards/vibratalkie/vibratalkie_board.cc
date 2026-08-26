@@ -369,7 +369,7 @@ private:
         i2c_device_config_t device_config = {
             .dev_addr_length = I2C_ADDR_BIT_LEN_7,
             .device_address = kAds1115Address,
-            .scl_speed_hz = 100 * 1000,
+            .scl_speed_hz = 400 * 1000,
             .scl_wait_us = 0,
             .flags = {
                 .disable_ack_check = 0,
@@ -378,9 +378,11 @@ private:
         ESP_ERROR_CHECK(i2c_master_bus_add_device(
             i2c_bus_, &device_config, &ads1115_device_));
 
-        // Config 0xC283:
-        // AIN0-GND, +/-4.096V PGA, continuous mode, 128 SPS, comparator off.
-        uint8_t config[] = {0x01, 0xC2, 0x83};
+        // Config 0xC2E3:
+        // AIN0-GND, +/-4.096V PGA, continuous mode, 860 SPS, comparator off.
+        // PC stream mode samples this conversion register at 800 Hz and records
+        // an independent device-clock timestamp for every throat-vibration sample.
+        uint8_t config[] = {0x01, 0xC2, 0xE3};
         ret = i2c_master_transmit(ads1115_device_, config, sizeof(config), 200);
         if (ret != ESP_OK) {
             ESP_LOGE(TAG, "ADS1115 configuration failed: %s", esp_err_to_name(ret));
@@ -389,9 +391,11 @@ private:
             return;
         }
 
-        ESP_LOGI(TAG, "ADS1115 initialized at 0x%02X, AIN0 continuous sampling enabled",
+        ESP_LOGI(TAG, "ADS1115 initialized at 0x%02X, AIN0 continuous sampling at 860 SPS",
                  kAds1115Address);
+#if !CONFIG_PC_RAW_STREAM_MODE
         xTaskCreate(Ads1115PrintTask, "ads1115_print", 3072, this, 5, nullptr);
+#endif
     }
 
     // SPI初始化（用于显示屏）
@@ -536,7 +540,8 @@ private:
 
 public:
     // 构造函数
-    VibratalkieBoard() : DualNetworkBoard(Module_4G_TX_PIN, Module_4G_RX_PIN),
+    VibratalkieBoard() : DualNetworkBoard(Module_4G_TX_PIN, Module_4G_RX_PIN,
+                                          GPIO_NUM_NC, 0),  // 默认使用 WiFi
                            boot_button_(BOOT_BUTTON_GPIO),
                            volume_up_button_(VOLUME_UP_BUTTON_GPIO) {
         InitializeI2c();
@@ -615,6 +620,22 @@ public:
 
         level = pmic_->GetBatteryLevel();
         //ESP_LOGI(TAG, "Battery: level=%d%%, charging=%d, discharging=%d, timer_enabled=%d", level, charging, discharging, power_save_timer_->IsEnabled());
+        return true;
+    }
+
+    virtual bool ReadAdcRaw(int16_t& raw) override {
+        if (ads1115_device_ == nullptr) {
+            return false;
+        }
+        uint8_t conversion_reg = 0x00;
+        uint8_t data[2] = {};
+        esp_err_t ret = i2c_master_transmit_receive(
+            ads1115_device_, &conversion_reg, 1, data, sizeof(data), 200);
+        if (ret != ESP_OK) {
+            ESP_LOGW(TAG, "ADS1115 raw read failed: %s", esp_err_to_name(ret));
+            return false;
+        }
+        raw = static_cast<int16_t>((static_cast<uint16_t>(data[0]) << 8) | data[1]);
         return true;
     }
 

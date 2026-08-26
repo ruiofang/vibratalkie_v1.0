@@ -302,7 +302,8 @@
             <form action="/submit" method="post" onsubmit="submitForm(event)">
                 <p>
                     <label for="ssid">SSID:</label>
-                    <input type="text" id="ssid" name="ssid" required readonly>
+                    <input type="text" id="ssid" name="ssid" required
+                           placeholder="可手动输入 Wi-Fi 名称 / Enter SSID">
                 </p>
                 <p>
                     <label for="password" data-lang="password">Password:</label>
@@ -310,6 +311,7 @@
                 </p>
                 <p style="text-align: center;">
                     <input type="submit" value="Connect" id="button" data-lang-value="connect">
+                    <button type="button" id="scan_button" onclick="loadAPList(true)">重新扫描 / Rescan</button>
                 </p>
             </form>
             <p style="text-align:center;display:none" id="wifi_connected_actions">
@@ -407,6 +409,8 @@
         const button = document.getElementById('button');
         const error = document.getElementById('error');
         const ssid = document.getElementById('ssid');
+        let apRefreshTimer = null;
+        let apRequestInFlight = false;
         let support5G = false; // Store 5G support status
 
         // ========== Translation Data ==========
@@ -1324,23 +1328,28 @@
         /**
          * Load available Wi-Fi networks
          */
-        function loadAPList() {
-            if (button.disabled) {
+        function loadAPList(force = false) {
+            if (button.disabled || apRequestInFlight) {
                 return;
             }
 
-            const lang = document.getElementById('language').value;
-            const apList = document.getElementById('ap_list');
-
-            // Check if AP list already has content
-            const hasExistingAPs = apList.querySelector('a') !== null;
-
-            // Only show scanning text if there's no existing AP list
-            if (!hasExistingAPs) {
-                apList.innerHTML = '<p class="scanning">' + translations[lang].scanning + '</p>';
+            // Once an SSID has been selected or entered manually, keep the list
+            // stable so periodic refreshes cannot move the item under the finger.
+            if (ssid.value.trim() && !force) {
+                return;
             }
 
-            fetch('/scan')
+            if (apRefreshTimer) {
+                clearTimeout(apRefreshTimer);
+                apRefreshTimer = null;
+            }
+            apRequestInFlight = true;
+
+            const lang = document.getElementById('language').value;
+            const apList = document.getElementById('ap_list');
+            apList.innerHTML = '<p class="scanning">' + translations[lang].scanning + '</p>';
+
+            fetch(force ? '/scan?refresh=1' : '/scan')
                 .then(response => response.json())
                 .then(data => {
                     // Update global 5G support status
@@ -1348,7 +1357,17 @@
                     
                     // Use select_wifi_5g if 5G is supported, otherwise use select_wifi
                     const selectText = support5G ? translations[lang].select_wifi_5g : translations[lang].select_wifi;
-                    apList.innerHTML = '<p>' + selectText + '</p>';
+                    if (!data.aps || data.aps.length === 0) {
+                        if (data.scan_complete) {
+                            apList.innerHTML = '<p>✓ 扫描完成，未发现网络；可手动输入 SSID 或重新扫描</p>';
+                        } else {
+                            apList.innerHTML = '<p class="scanning">' + translations[lang].scanning + '</p>';
+                            apRefreshTimer = setTimeout(() => loadAPList(false), 1500);
+                        }
+                        return;
+                    }
+
+                    apList.innerHTML = '<p>✓ ' + selectText + '</p>';
                     
                     // Iterate through available APs
                     data.aps.forEach(ap => {
@@ -1363,20 +1382,27 @@
                             link.textContent += ' 🔒';
                         }
                         
-                        link.addEventListener('click', () => {
+                        link.addEventListener('click', event => {
+                            event.preventDefault();
                             ssid.value = ap.ssid;
+                            document.getElementById('password').focus();
+                            if (apRefreshTimer) {
+                                clearTimeout(apRefreshTimer);
+                                apRefreshTimer = null;
+                            }
                         });
                         
                         apList.appendChild(link);
                     });
                     
-                    // Refresh AP list every 5 seconds
-                    setTimeout(loadAPList, 5000);
                 })
                 .catch(error => {
                     console.error('Error:', error);
-                    // On error, try again after 5 seconds
-                    setTimeout(loadAPList, 5000);
+                    apList.innerHTML = '<p class="error">扫描失败，可手动输入 SSID 或点击重新扫描</p>';
+                    apRefreshTimer = setTimeout(() => loadAPList(false), 3000);
+                })
+                .finally(() => {
+                    apRequestInFlight = false;
                 });
         }
 
