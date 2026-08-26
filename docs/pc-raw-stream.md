@@ -24,6 +24,9 @@ python scripts/release.py vibratalkie --name vibratalkie-pc-stream
 配置发现地址、端口和 ADC 采样率。新配置首次启动默认选择 Wi-Fi；如果 NVS
 里已有 4G 选择，启动阶段按 BOOT 键切换到 Wi-Fi，或长按 BOOT 恢复网络设置。
 
+设备连接 Wi-Fi 并进入 PC 原始流待机状态后，短按 BOOT 键每次将扬声器音量降低
+10%，最低为 0%；右侧按键每次增加 10%，最高为 100%。BOOT 长按恢复配网的功能不变。
+
 ## 9999 端口自动发现流程
 
 1. PC 服务绑定 `0.0.0.0:9999`。

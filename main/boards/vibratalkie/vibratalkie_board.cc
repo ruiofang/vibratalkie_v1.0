@@ -418,6 +418,21 @@ private:
                 SwitchNetworkType();
                 return; // 切换网络类型后直接返回，不执行聊天状态切换
             }
+#if CONFIG_PC_RAW_STREAM_MODE
+            if (app.GetDeviceState() == kDeviceStateIdle) {
+                // PC 原始流模式连接成功后，BOOT 短按作为音量减键。
+                power_save_timer_->WakeUp();
+                auto codec = GetAudioCodec();
+                auto volume = codec->output_volume() - 10;
+                if (volume < 0) {
+                    volume = 0;
+                }
+                codec->SetOutputVolume(volume);
+                GetDisplay()->ShowNotification(Lang::Strings::VOLUME + std::to_string(volume));
+                ESP_LOGI(TAG, "BOOT short press: output volume decreased to %d", volume);
+                return;
+            }
+#endif
             app.ToggleChatState(); 
         });
 

@@ -1,0 +1,17 @@
+{
+  "audio_origin_device_timestamp_us": -55177758,
+  "sample_rate": 24000,
+  "channels": 3,
+  "channel_order": [
+    "MIC1",
+    "REF",
+    "MIC2"
+  ],
+  "audio_frames": 1726243,
+  "inserted_gap_frames": 14106,
+  "trimmed_overlap_frames": 7463,
+  "estimated_udp_packets_lost": 50,
+  "adc_samples": 57296,
+  "adc_effective_rate_hz": null,
+  "device_restart_count": 1
+}
