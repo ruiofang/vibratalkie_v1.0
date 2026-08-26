@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/**/*.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/xiaozhi/ota/(.*)",
+      "dest": "/api/ota/$1"
+    },
+    {
+      "src": "/xiaozhi/ota/?$",
+      "dest": "/api/ota/index.js"
+    }
+  ]
+}

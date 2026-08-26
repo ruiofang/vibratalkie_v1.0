@@ -1,0 +1,90 @@
+#ifndef _BOARD_CONFIG_H_
+#define _BOARD_CONFIG_H_
+
+#include <driver/gpio.h>
+
+#define AUDIO_INPUT_SAMPLE_RATE  24000
+#define AUDIO_OUTPUT_SAMPLE_RATE 24000
+
+#define AUDIO_INPUT_REFERENCE    true
+
+#define AUDIO_I2S_GPIO_MCLK GPIO_NUM_41
+#define AUDIO_I2S_GPIO_WS GPIO_NUM_40
+#define AUDIO_I2S_GPIO_BCLK GPIO_NUM_42
+#define AUDIO_I2S_GPIO_DIN  GPIO_NUM_45
+#define AUDIO_I2S_GPIO_DOUT GPIO_NUM_39
+
+#define AUDIO_CODEC_PA_PIN       GPIO_NUM_NC
+#define AUDIO_CODEC_I2C_SDA_PIN  GPIO_NUM_2
+#define AUDIO_CODEC_I2C_SCL_PIN  GPIO_NUM_3
+#define AUDIO_CODEC_ES8311_ADDR  ES8311_CODEC_DEFAULT_ADDR
+#define AUDIO_CODEC_ES7210_ADDR  0x82
+
+#define BUILTIN_LED_GPIO        GPIO_NUM_38
+#define BOOT_BUTTON_GPIO        GPIO_NUM_0
+#define TOUCH_BUTTON_GPIO       GPIO_NUM_NC
+#define VOLUME_UP_BUTTON_GPIO   GPIO_NUM_1
+#define VOLUME_DOWN_BUTTON_GPIO GPIO_NUM_NC
+
+#define DISPLAY_MOSI_PIN      GPIO_NUM_8
+#define DISPLAY_CLK_PIN       GPIO_NUM_9
+#define DISPLAY_DC_PIN        GPIO_NUM_6
+#define DISPLAY_RST_PIN       GPIO_NUM_7
+#define DISPLAY_CS_PIN        GPIO_NUM_5
+
+#define DISPLAY_BACKLIGHT_PIN GPIO_NUM_4 //背光使能
+#define DISPLAY_BACKLIGHT_OUTPUT_INVERT true
+
+#if defined(CONFIG_DISPLAY_USE_GC9D01)
+// GC9D01 160x160 圆形屏
+#define DISPLAY_WIDTH   160
+#define DISPLAY_HEIGHT  160
+#define DISPLAY_MIRROR_X false
+#define DISPLAY_MIRROR_Y false
+#define DISPLAY_SWAP_XY false
+#define DISPLAY_INVERT_COLOR    false
+#define DISPLAY_RGB_ORDER  LCD_RGB_ELEMENT_ORDER_RGB
+#define DISPLAY_OFFSET_X  0
+#define DISPLAY_OFFSET_Y  0
+#define DISPLAY_SPI_MODE 0
+#define DISPLAY_PCLK_HZ (40 * 1000 * 1000)
+#elif defined(CONFIG_DISPLAY_USE_GC9A01)
+// GC9A01 240x240 圆形屏
+#define DISPLAY_WIDTH   240
+#define DISPLAY_HEIGHT  240
+#define DISPLAY_MIRROR_X true
+#define DISPLAY_MIRROR_Y false
+#define DISPLAY_SWAP_XY false
+#define DISPLAY_INVERT_COLOR    true
+#define DISPLAY_RGB_ORDER  LCD_RGB_ELEMENT_ORDER_BGR
+#define DISPLAY_OFFSET_X  0
+#define DISPLAY_OFFSET_Y  0
+#define DISPLAY_SPI_MODE 0
+#define DISPLAY_PCLK_HZ (40 * 1000 * 1000)
+#else
+// ST7789 240x240 方形屏（默认）
+// 旋转角度	MIRROR_X	MIRROR_Y	SWAP_XY
+// 0°	    false	    false	    false
+// 90°	    false	    true	    true
+// 180°	    true	    true	    false
+// 270°	    true	    false	    true
+#define DISPLAY_WIDTH   240
+#define DISPLAY_HEIGHT  240
+#define DISPLAY_MIRROR_X true
+#define DISPLAY_MIRROR_Y true
+#define DISPLAY_SWAP_XY false
+#define DISPLAY_INVERT_COLOR    true
+#define DISPLAY_RGB_ORDER  LCD_RGB_ELEMENT_ORDER_RGB
+#define DISPLAY_OFFSET_X  0
+#define DISPLAY_OFFSET_Y  80
+#define DISPLAY_SPI_MODE 0
+#define DISPLAY_PCLK_HZ (80 * 1000 * 1000)
+#endif
+
+#define AXP173_I2C_ADDR 0x34
+#define AXP173_IRQ_GPIO GPIO_NUM_46
+
+#define Module_4G_RX_PIN GPIO_NUM_44
+#define Module_4G_TX_PIN GPIO_NUM_43
+
+#endif // _BOARD_CONFIG_H_
