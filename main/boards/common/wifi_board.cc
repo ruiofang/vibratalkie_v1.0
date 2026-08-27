@@ -60,7 +60,7 @@ void WifiBoard::EnterWifiConfigMode() {
 
     auto& wifi_ap = WifiConfigurationAp::GetInstance();
     wifi_ap.SetLanguage(Lang::CODE);
-    wifi_ap.SetSsidPrefix("Xiaozhi");
+    wifi_ap.SetSsidPrefix("vibratalkie");
     wifi_ap.OnConnected([](const std::string& ssid, const std::string& ip) {
         ShowNetworkDebugInfo(ssid, ip);
     });

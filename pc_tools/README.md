@@ -8,6 +8,7 @@
 - `pc_raw_stream_server.py`：UDP 9999 发现设备、接收音频和 ADC、实时监听、保存采集数据，以及把 PC 麦克风声音回传给设备。
 - `pc_audio_gui.py`：图形化调试工具，可在接收、监听和保存数据的同时随时选择音频下发到设备。
 - `pc_stream_dataset.py`：读取 `pc_stream_data`，按共同时间轴生成 NumPy/PyTorch 训练窗口或导出 NPZ。
+- [`PC_RAW_STREAM_PROTOCOL.md`](PC_RAW_STREAM_PROTOCOL.md)：UDP 包头、设备发现、音频/ADC 上行及扬声器 PCM 下行协议说明。
 - `pc_stream_data说明.md`：采集目录、各字段、时间对齐、质量检查和训练模型导入说明。
 - `requirements.txt`：PC Python 依赖。
 

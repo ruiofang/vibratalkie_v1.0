@@ -1,0 +1,8 @@
+dist/
+build/
+__pycache__/
+fonts/
+tmp/
+
+# These packaged font binaries are source assets for the firmware build.
+!cbin/*.bin

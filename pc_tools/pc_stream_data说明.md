@@ -58,6 +58,39 @@ python3 pc_raw_stream_server.py --output-dir pc_stream_data/session_001
 | `ref_raw` | `audio_frame_index` 位置的扬声器参考通道 PCM 原始值 |
 | `mic2_raw` | `audio_frame_index` 位置的 MIC2 signed 16-bit PCM 原始值 |
 
+#### 将 `raw` 换算为电压
+
+当前固件将 ADS1115 配置为 AIN0 对 GND 单端采样、PGA 量程 ±4.096 V。ADS1115 输出为
+signed 16-bit 原始码，因此每个计数对应：
+
+```text
+LSB = 4.096 V / 32768 = 0.000125 V = 0.125 mV
+电压(V) = raw × 4.096 / 32768
+        = raw × 0.000125
+```
+
+例如下面一行数据中的第三列 `raw` 为 `13540`：
+
+```csv
+41281502,5479,13540,748616,31.192333333,335,-15,301
+```
+
+计算过程为：
+
+```text
+13540 × 0.000125 V = 1.6925 V
+```
+
+所以该 ADC 样本对应约 **1.693 V**。也可以在 Python 中批量换算：
+
+```python
+voltage_v = raw * 4.096 / 32768.0
+```
+
+负的 `raw` 应保留符号参与计算。此公式只适用于 ADS1115 的 `raw` 字段；`mic1_raw`、
+`ref_raw` 和 `mic2_raw` 是音频 PCM 采样值，不能用该公式换算电压。若需要得到传感器
+相对于静态偏置的振动信号，还应先测量并减去静态偏置，必要时再按模拟前端增益校准。
+
 对齐关系：
 
 ```text

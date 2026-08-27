@@ -289,42 +289,6 @@ menu "VIBRATALKIE_CONFIG"
             bool "Use ST7789 LCD (240x240)"
     endchoice
 
-    config VIBRATALKIE_ANIMATED_FACE
-    bool "Enable animated eye face"
-    default y
-    help
-        启用动态眼睛表情，替代默认的静态emoji图标
-
-    choice VIBRATALKIE_EYE_STYLE
-        prompt "Eye rendering style"
-        default VIBRATALKIE_EYE_BITMAP
-        depends on VIBRATALKIE_ANIMATED_FACE
-        help
-            选择眼睛渲染方式
-
-        config VIBRATALKIE_EYE_VECTOR
-            bool "LVGL vector cat-eye (矢量猫眼)"
-            help
-                LVGL 绘制的卡通猫咪风格矢量眼睛，支持单/双眼模式
-
-        config VIBRATALKIE_EYE_BITMAP
-            bool "Bitmap realistic eye (位图写实眼)"
-            help
-                像素级位图合成写实眼睛（移植自RoPet），使用巩膜/虹膜/眼睑 PNG 资源。
-                支持通过 eye_data_generator.py 工具自定义眼睛外观。
-                单个眼球样式约占 500KB(240x240) 或 228KB(160x160) Flash。
-    endchoice
-
-    config VIBRATALKIE_SINGLE_EYE
-    bool "Single eye mode (双屏并联)"
-    default n
-    depends on VIBRATALKIE_ANIMATED_FACE && VIBRATALKIE_EYE_VECTOR
-    help
-        单眼模式：每块屏幕只显示一只大眼睛，用于两块屏幕并联方案。
-        两块屏幕烧同一个固件，显示内容完全一样。
-        关闭则为默认的单屏双眼模式。
-        仅矢量猫眼模式支持此选项，位图眼默认为单眼并联。
-
 endmenu
 
 endmenu

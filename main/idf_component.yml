@@ -97,6 +97,27 @@ dependencies:
     rules:
     - if: target in [esp32p4]
 
+  # Keep transitive dependencies local as well. This prevents the component
+  # manager from resolving them back into managed_components on reconfigure.
+  78/esp-opus:
+    override_path: ../components/78__esp-opus
+  espressif/cmake_utilities:
+    override_path: ../components/espressif__cmake_utilities
+  espressif/dl_fft:
+    override_path: ../components/espressif__dl_fft
+  espressif/esp-dsp:
+    override_path: ../components/espressif__esp-dsp
+  espressif/esp_io_expander:
+    override_path: ../components/espressif__esp_io_expander
+  espressif/esp_lcd_touch:
+    override_path: ../components/espressif__esp_lcd_touch
+  espressif/esp_sccb_intf:
+    override_path: ../components/espressif__esp_sccb_intf
+  espressif/freetype:
+    override_path: ../components/espressif__freetype
+  espressif/usb_host_uvc:
+    override_path: ../components/espressif__usb_host_uvc
+
   ## Required IDF version
   idf:
     version: '>=5.4.0'
