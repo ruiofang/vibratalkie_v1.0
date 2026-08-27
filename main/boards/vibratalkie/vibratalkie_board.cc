@@ -6,13 +6,6 @@
 #include "button.h"
 #include "config.h"
 #include "i2c_device.h"
-#ifdef CONFIG_VIBRATALKIE_ANIMATED_FACE
-    #ifdef CONFIG_VIBRATALKIE_EYE_BITMAP
-        #include "vibratalkie_bitmap_eye_display.h"
-    #else
-        #include "vibratalkie_eye_display.h"
-    #endif
-#endif
 
 #include <esp_log.h>
 #include <esp_lcd_panel_vendor.h>
@@ -447,10 +440,10 @@ private:
             // 1. 清除所有已保存的 WiFi SSID
             SsidManager::GetInstance().Clear();
 
-            // 2. 清除网络类型选择，恢复默认（4G优先）
+            // 2. 恢复为 WiFi 网络；重启后直接进入 WiFi 配网模式
             {
                 Settings net_settings("network", true);
-                net_settings.SetInt("type", 1);
+                net_settings.SetInt("type", 0);
             }
 
             // 3. 清除 force_ap 标志，确保下次以干净状态进入配网
@@ -533,24 +526,8 @@ private:
         esp_lcd_panel_swap_xy(panel, DISPLAY_SWAP_XY);
         esp_lcd_panel_mirror(panel, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y);
 
-#ifdef CONFIG_VIBRATALKIE_ANIMATED_FACE
-#ifdef CONFIG_VIBRATALKIE_EYE_BITMAP
-        display_ = new VibratalkieBitmapEyeDisplay(panel_io, panel,
-                                    DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_OFFSET_X, DISPLAY_OFFSET_Y, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y, DISPLAY_SWAP_XY);
-#else
-        display_ = new VibratalkieEyeDisplay(panel_io, panel,
-                                    DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_OFFSET_X, DISPLAY_OFFSET_Y, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y, DISPLAY_SWAP_XY,
-#ifdef CONFIG_VIBRATALKIE_SINGLE_EYE
-                                    true   // 单眼模式
-#else
-                                    false  // 双眼模式
-#endif
-                                    );
-#endif
-#else
         display_ = new SpiLcdDisplay(panel_io, panel,
                                     DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_OFFSET_X, DISPLAY_OFFSET_Y, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y, DISPLAY_SWAP_XY);
-#endif
     }
 
 public:

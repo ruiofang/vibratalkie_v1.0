@@ -21,6 +21,22 @@ except ImportError:  # Direct execution: python3 pc_audio_gui.py
     from pc_raw_stream_server import PcRawStreamServer, TOOL_DIR
 
 
+CAPTURE_FILES = ("adc_raw.csv", "audio_timing.csv",
+                 "audio_24000hz_3ch.wav", "capture_metadata.json")
+
+
+def make_timestamped_output_dir(base_dir: Path, now: datetime | None = None) -> Path:
+    """Return an unused timestamped sibling derived from a stable base name."""
+    timestamp = (now or datetime.now()).strftime("%Y%m%d_%H%M%S")
+    session_name = f"{base_dir.name}_{timestamp}"
+    candidate = base_dir.parent / session_name
+    collision = 1
+    while candidate.exists():
+        candidate = base_dir.parent / f"{session_name}_{collision:02d}"
+        collision += 1
+    return candidate
+
+
 class QueueWriter:
     def __init__(self, output_queue: queue.Queue[str]) -> None:
         self.output_queue = output_queue
@@ -50,10 +66,12 @@ class PcAudioGui:
         sys.stdout = QueueWriter(self.log_queue)
         sys.stderr = QueueWriter(self.log_queue)
 
-        default_session = datetime.now().strftime("gui_%Y%m%d_%H%M%S")
+        self.output_base_dir = TOOL_DIR / "pc_stream_data" / "gui"
+        default_output_dir = make_timestamped_output_dir(self.output_base_dir)
+        self.displayed_output_dir = default_output_dir.resolve()
+        self.last_output_dir: Path | None = None
         self.port_var = tk.StringVar(value="9999")
-        self.output_var = tk.StringVar(
-            value=str(TOOL_DIR / "pc_stream_data" / default_session))
+        self.output_var = tk.StringVar(value=str(default_output_dir))
         self.monitor_var = tk.BooleanVar(value=True)
         self.send_mic_var = tk.BooleanVar(value=False)
         self.input_device_var = tk.StringVar(value="")
@@ -127,8 +145,11 @@ class PcAudioGui:
     def choose_output_dir(self) -> None:
         selected = filedialog.askdirectory(initialdir=self.output_var.get())
         if selected:
-            self.output_var.set(selected)
-            self.output_status_var.set(f"保存：{selected}")
+            selected_dir = Path(selected).expanduser().resolve()
+            self.output_base_dir = selected_dir
+            self.displayed_output_dir = selected_dir
+            self.output_var.set(str(selected_dir))
+            self.output_status_var.set(f"保存：{selected_dir}")
 
     def make_server_args(self) -> argparse.Namespace:
         try:
@@ -159,12 +180,20 @@ class PcAudioGui:
         except ValueError as exc:
             messagebox.showerror("配置错误", str(exc))
             return
-        capture_files = ("adc_raw.csv", "audio_timing.csv",
-                         "audio_24000hz_3ch.wav", "capture_metadata.json")
-        if any((args.output_dir / name).exists() for name in capture_files):
-            suffix = datetime.now().strftime("%Y%m%d_%H%M%S")
-            args.output_dir = args.output_dir.parent / f"{args.output_dir.name}_{suffix}"
-            self.output_var.set(str(args.output_dir))
+
+        # An Entry edit is a new user-selected base. Programmatic updates after
+        # a capture must not become the base, or timestamps grow indefinitely.
+        if args.output_dir != self.displayed_output_dir:
+            self.output_base_dir = args.output_dir
+        output_was_used = (args.output_dir == self.last_output_dir or
+                           any((args.output_dir / name).exists()
+                               for name in CAPTURE_FILES))
+        if output_was_used:
+            args.output_dir = make_timestamped_output_dir(self.output_base_dir)
+
+        self.displayed_output_dir = args.output_dir
+        self.last_output_dir = args.output_dir
+        self.output_var.set(str(args.output_dir))
 
         self.start_button.configure(state=tk.DISABLED)
         self.stop_button.configure(state=tk.NORMAL)
