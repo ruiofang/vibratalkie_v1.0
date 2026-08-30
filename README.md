@@ -61,8 +61,8 @@ Vibratalkie AI聊天机器人控制板套件，支持 WiFi + 4G 双网络模式�
 下载附件中的代码，覆盖到完整项目代码中。
 
 本仓库只在 `components/` 中保留修改过配网页面的 `78__esp-wifi-connect`，并通过
-`main/idf_component.yml` 的 `override_path` 使用该本地组件。其余依赖全部由 ESP-IDF
-Component Manager 下载并保存在 `managed_components/`，无需提交到 Git 仓库。
+`main/CMakeLists.txt` 直接依赖该项目组件，不绑定项目的绝对目录。其余依赖全部由
+ESP-IDF Component Manager 下载并保存在 `managed_components/`，无需提交到 Git 仓库。
 
 ### 2. 编辑 `main/CMakeLists.txt`
 
